@@ -7,6 +7,7 @@ using Luxor, Astro # from http://github.com/cormullion
 function lefthemi(x, y, r, col) # draw a left hemisphere
     save()
     sethue(col)
+    newpath()
     arc(x, y, r, pi/2, -pi/2, :fill)    # positive clockwise from x axis in radians
     restore()
 end
@@ -14,6 +15,7 @@ end
 function righthemi(x, y, r, col)
     save()
     sethue(col)
+    newpath()
     arc(x, y, r, -pi/2, pi/2, :fill)    # positive clockwise from x axis in radians
     restore()
 end

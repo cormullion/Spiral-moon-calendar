@@ -60,6 +60,7 @@ function moon(x, y, r, age, positionangle, foregroundcolour="darkblue", backgrou
     # ellipse is scaled horizontally to render phases
     save()
     translate(x, y)
+    setopacity(1)
     if 0 <= age < 0.25
         righthemi(0, 0, r, foregroundcolour)
         moonwidth = 1 - (age * 4) # goes from 1 down to 0 width (for half moon)

@@ -5,27 +5,27 @@ using Colors
 using Luxor, Astro # from http://github.com/cormullion
 
 function lefthemi(x, y, r, col) # draw a left hemisphere
-    save()
+    gsave()
     sethue(col)
     newpath()
     arc(x, y, r, pi/2, -pi/2, :fill)    # positive clockwise from x axis in radians
-    restore()
+    grestore()
 end
 
 function righthemi(x, y, r, col)
-    save()
+    gsave()
     sethue(col)
     newpath()
     arc(x, y, r, -pi/2, pi/2, :fill)    # positive clockwise from x axis in radians
-    restore()
+    grestore()
 end
 
 function ellipse(x, y, r, col, horizscale)
-    save()
+    gsave()
     sethue(col)
     Luxor.scale(horizscale + 0.00000001, 1) # cairo doesn't like 0 scale :)
     circle(x, y, r, :fill)
-    restore()
+    grestore()
 end
 
 function spiraltextcurve(str, x, y, xc, yc, r1, r2, offset=0.0)
@@ -37,28 +37,28 @@ function spiraltextcurve(str, x, y, xc, yc, r1, r2, offset=0.0)
         x_advance = extents[5]
         push!(widths, x_advance)
     end
-    save()
+    gsave()
     rads = linspace(r1, r2, length(str))
     arclength = rads[1] * atan2(y - yc, x - xc) # starting on line passing through x/y but using radius
     arclength += offset
     for i in 1:length(str)
-        save()
+        gsave()
         theta = arclength/rads[i]  # angle for this character
         delta = widths[i]/rads[i] # amount of turn created by width of this char
         translate(rads[i] * cos(theta), rads[i] * sin(theta)) # move the origin to this point
         rotate(theta + pi/2 + delta/2) # rotate so text baseline perp to center
         text(str[i:i])
         arclength += widths[i] # move on by the width of this character
-        restore()
+        grestore()
     end
-    restore()
+    grestore()
 end
 
 function moon(x, y, r, age, positionangle, foregroundcolour="darkblue", backgroundcolour="gray")
     # draw a moon by superimposing three circles or ellipses
     # phase is moon's age normalized to 0 - 1, 0 = new moon, 0.5 = 14 days/full, 1.0 = dead moon
     # ellipse is scaled horizontally to render phases
-    save()
+    gsave()
     translate(x, y)
     setopacity(1)
     if 0 <= age < 0.25
@@ -88,7 +88,7 @@ function moon(x, y, r, age, positionangle, foregroundcolour="darkblue", backgrou
         ellipse(0,0, r, backgroundcolour, moonwidth)
         righthemi(0, 0, r, backgroundcolour)
     end
-    restore()
+    grestore()
 end
 
 function rectangular_calendar(theyear)
@@ -151,7 +151,7 @@ function spiral_calendar(theyear)
         (age,dist,lat,long) = moon_age_location(jd) # age is 15 for full
 
         # draw moon and dayname
-        save()
+        gsave()
         translate(x, y)
         rotate(around + pi/2) # rotate and then get text baseline
         moon(0, 0, moonsize, age/29.530589, -pi/2, "lightyellow", "midnightblue")
@@ -159,10 +159,10 @@ function spiral_calendar(theyear)
         sethue("white")
         fontsize(7)
         textcentred(Dates.dayname(last(everyday)), 0, - (moonsize + 6)) # dayname
-        restore()
+        grestore()
 
         # day number isn't rotated
-        save()
+        gsave()
         a = atan2(y,x) - 0.01 # adjust for lack of optical
         x1 , y1 = (away - (moonsize * 1.85)) * cos(a), (away - (moonsize * 1.85)) * sin(a)
         translate(x1,y1)
@@ -170,7 +170,7 @@ function spiral_calendar(theyear)
         sethue("white")
         fontsize(11)
         textcentred(lowercase(string(d[3]))) # day number
-        restore()
+        grestore()
 
         # month text needs special handling
         if d[3]==1
@@ -193,9 +193,9 @@ function spiral_calendar(theyear)
     setline(1)
     rect(-(currentwidth/2) + 12, -(currentheight/2) + 12, currentwidth - 24, currentheight - 24, :stroke)
 
-    save()
+    gsave()
     for i in 1:4
-        save()
+        gsave()
         # large title
         translate(-(currentwidth/2) + 40, -(currentwidth/2) + 110)
         fontsize(81)
@@ -212,22 +212,22 @@ function spiral_calendar(theyear)
         translate(shift/2, 60)
 
         # orbit ellipse
-        save()
+        gsave()
         Luxor.scale(1, 0.2)
         circle(0, 0, 45, :stroke)
-        restore()
+        grestore()
         # planet and moon
-        save()
+        gsave()
         setline(.7)
         sethue("midnightblue")
         circle(0, -3, 7, :stroke)
-        restore()
+        grestore()
         circle(0, -3, 7, :fill) # planet
         circle(45, 0, 3, :fill) # moon
-        restore()
+        grestore()
         rotate(pi/2)
     end
-    restore()
+    grestore()
     # and finally an email address
     setopacity(0.8)
     fontsize(4)

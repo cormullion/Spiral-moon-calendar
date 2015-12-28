@@ -1,4 +1,4 @@
-VERSION >= v"0.4.0-dev+6641" && __precompile__()
+VERSION >= v"0.4.0" && __precompile__()
 
 using Colors
 
@@ -231,22 +231,20 @@ function spiral_calendar(theyear)
     # and finally an email address
     setopacity(0.8)
     fontsize(4)
-    sethue(25/255, 25/255, 130/255)
+    sethue(35/255, 35/255, 150/255)
     translate(0, -70 + (currentheight + 100)/2)
     textcentred("cormullion@mac.com")
 end
 
 # start here
 
+theyear = 2016
 global currentwidth = 1500  # = 56.45 cm
 global currentheight = 1500 # = 56.45 cm
-Drawing(currentwidth+100, currentheight+100, "/tmp/2015-moon.pdf")
-
+Drawing(currentwidth+100, currentheight+100, "/tmp/$(theyear)-moon-phase-calendar.pdf")
 origin()
-
 background(RGB(25/255, 25/255, 100/255))
-
-# rectangular_calendar(2015)
-spiral_calendar(2015)
+# rectangular_calendar(theyear)
+spiral_calendar(theyear)
 finish()
 preview()

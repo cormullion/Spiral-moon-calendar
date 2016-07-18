@@ -1,3 +1,5 @@
+#!/usr/bin/env julia
+
 VERSION >= v"0.4.0" && __precompile__()
 
 using Colors

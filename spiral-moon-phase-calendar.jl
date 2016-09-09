@@ -240,9 +240,9 @@ end
 
 # start here
 
-theyear = 2016
-global currentwidth = 1500  # = 56.45 cm
-global currentheight = 1500 # = 56.45 cm
+theyear = 2017
+global currentwidth = 1500
+global currentheight = 1500
 Drawing(currentwidth+100, currentheight+100, "/tmp/$(theyear)-moon-phase-calendar.pdf")
 origin()
 background(RGB(25/255, 25/255, 100/255))

@@ -1,133 +1,107 @@
 #!/usr/bin/env julia
 
-VERSION >= v"0.4.0" && __precompile__()
+__precompile__()
 
-using Colors
+using Colors, Luxor, AstroLib
 
-using Luxor, Astro # from http://github.com/cormullion
+function moon_age_location(jd::Float64)
+    # pinched from Astro.jl
+    earth_equ_radius = 6378.137
+    v  = (jd - 2451550.1) / 29.530588853
+    ip = v - floor(Integer, v)
+    ag = ip * 29.530588853   # Moon's age from new moon in days
+    ip = ip * 2pi            # Converts to radian
 
-function lefthemi(x, y, r, col) # draw a left hemisphere
+    # Calculate distance from anomalistic phase
+    v= (jd - 2451562.2) / 27.55454988
+    dp = v- floor(Integer, v)
+    dp = dp * 2pi
+    di = 60.4 - 3.3 * cos(dp) - .6 * cos(2 * ip - dp) - .5 * cos(2 * ip)
+
+    # Calculate ecliptic latitude from nodal (draconic) phase
+    v = (jd - 2451565.2) / 27.212220817
+    np = v - floor(Integer, v)
+    np = np * 2pi
+    la = 5.1 * sin(np)
+
+    # Calculate ecliptic longitude from sidereal motion
+    v = (jd - 2451555.8) / 27.321582241
+    rp = v - floor(Integer, v)
+    lo = 360 * rp + 6.3 * sin(dp) + 1.3 * sin(2 * ip - dp) + .7 * sin(2 * ip)
+
+    return (ag, di * earth_equ_radius, deg2rad(la), deg2rad(lo))
+end
+
+function lefthemi(pt, r, col)         # draw a left hemisphere
     gsave()
     sethue(col)
     newpath()
-    arc(x, y, r, pi/2, -pi/2, :fill)    # positive clockwise from x axis in radians
+    arc(pt, r, pi/2, -pi/2, :fill)    # positive clockwise from x axis in radians
     grestore()
 end
 
-function righthemi(x, y, r, col)
+function righthemi(pt, r, col)
     gsave()
     sethue(col)
     newpath()
-    arc(x, y, r, -pi/2, pi/2, :fill)    # positive clockwise from x axis in radians
+    arc(pt, r, -pi/2, pi/2, :fill)    # positive clockwise from x axis in radians
     grestore()
 end
 
-function ellipse(x, y, r, col, horizscale)
+function ellipse(pt, r, col, horizscale)
     gsave()
     sethue(col)
     Luxor.scale(horizscale + 0.00000001, 1) # cairo doesn't like 0 scale :)
-    circle(x, y, r, :fill)
+    circle(pt, r, :fill)
     grestore()
 end
 
-function spiraltextcurve(str, x, y, xc, yc, r1, r2, offset=0.0)
-    # text on a curve with linearly decreasing radius
-    arclength = 0.0
-    widths = Float64[]
-    for i in 1:length(str)
-        extents = textextents(str[i:i])
-        x_advance = extents[5]
-        push!(widths, x_advance)
-    end
-    gsave()
-    rads = linspace(r1, r2, length(str))
-    arclength = rads[1] * atan2(y - yc, x - xc) # starting on line passing through x/y but using radius
-    arclength += offset
-    for i in 1:length(str)
-        gsave()
-        theta = arclength/rads[i]  # angle for this character
-        delta = widths[i]/rads[i] # amount of turn created by width of this char
-        translate(rads[i] * cos(theta), rads[i] * sin(theta)) # move the origin to this point
-        rotate(theta + pi/2 + delta/2) # rotate so text baseline perp to center
-        text(str[i:i])
-        arclength += widths[i] # move on by the width of this character
-        grestore()
-    end
-    grestore()
-end
-
-function moon(x, y, r, age, positionangle, foregroundcolour="darkblue", backgroundcolour="gray")
+function moon(pt::Point, r, age, positionangle,
+        foregroundcolour="darkblue",
+        backgroundcolour="gray")
     # draw a moon by superimposing three circles or ellipses
     # phase is moon's age normalized to 0 - 1, 0 = new moon, 0.5 = 14 days/full, 1.0 = dead moon
     # ellipse is scaled horizontally to render phases
     gsave()
-    translate(x, y)
+    translate(pt)
     setopacity(1)
     if 0 <= age < 0.25
-        righthemi(0, 0, r, foregroundcolour)
+        righthemi(pt, r, foregroundcolour)
         moonwidth = 1 - (age * 4) # goes from 1 down to 0 width (for half moon)
         setopacity(0.5)
-        ellipse(0, 0, r+ 0.02, RGB(25/255, 25/255, 100/255), moonwidth+0.02)
+        ellipse(O, r + 0.02, RGB(25/255, 25/255, 100/255), moonwidth + 0.02)
         setopacity(1.0)
-        ellipse(0, 0, r, backgroundcolour, moonwidth)
-        lefthemi(0, 0, r, backgroundcolour)
+        ellipse(O, r, backgroundcolour, moonwidth)
+        lefthemi(O, r, backgroundcolour)
     elseif 0.25 <= age < 0.50
-        lefthemi(0, 0, r, backgroundcolour)
-        righthemi(0, 0, r, foregroundcolour)
+        lefthemi(O, r, backgroundcolour)
+        righthemi(O, r, foregroundcolour)
         moonwidth = (age - .25) * 4
-        ellipse(0, 0, r, foregroundcolour, moonwidth)
+        ellipse(O, r, foregroundcolour, moonwidth)
     elseif .50 <= age < .75
-        lefthemi(0, 0, r, foregroundcolour)
-        righthemi(0, 0, r, backgroundcolour)
+        lefthemi(O, r, foregroundcolour)
+        righthemi(O, r, backgroundcolour)
         moonwidth = 1 - ((age-0.5) * 4)
-        ellipse(0,0, r, foregroundcolour, moonwidth)
+        ellipse(O, r, foregroundcolour, moonwidth)
     elseif .75 <= age <= 1.00
-        lefthemi(0, 0, r, foregroundcolour)
+        lefthemi(O, r, foregroundcolour)
         moonwidth = ((age - 0.75) * 4)
         setopacity(0.5)
-        ellipse(0, 0, r+ 0.02, RGB(25/255, 25/255, 100/255), moonwidth+0.02)
+        ellipse(O, r + 0.02, RGB(25/255, 25/255, 100/255), moonwidth + 0.02)
         setopacity(1.0)
-        ellipse(0,0, r, backgroundcolour, moonwidth)
-        righthemi(0, 0, r, backgroundcolour)
+        ellipse(O, r, backgroundcolour, moonwidth)
+        righthemi(O, r, backgroundcolour)
     end
     grestore()
 end
 
-function rectangular_calendar(theyear)
-   # for testing
-    currentyear = theyear
-    fontsize(6)
-    x = -1400
-    y = -1200
-
-    daterange = collect(DateTime(Date(currentyear,1,1)):DateTime.Day(1):DateTime.Date(currentyear,12,31))
-
-    for everyday in daterange
-        d = (year(everyday), month(everyday), day(everyday))
-        if d[3] == 1
-            x = -1400
-            y += 60
-        end
-        jd = apply(cal_to_jd, d)
-        moonfrac,moonangle = moon_illuminated_fraction_high(jd) # moonfrac is 1 for full
-        moonlat = moon_latitude(jd)
-        (age,dist,lat,long) = moon_age_location(jd) # age is 15 for full
-        println(d, " moonfrac ", moonfrac,  " moonangle ", moonangle, " age ", age, " moon lat ", moonlat)
-        moon(x, y, 20, age/29.530589, moonangle, "lightyellow", "darkblue")
-        sethue("white")
-        text(string(day(everyday), " ", dayname(everyday)), x, y + 30)
-        x += 60
-    end
-end
-
-function spiral_calendar(theyear)
-    global currentwidth, currentheight
+function spiral_calendar(theyear, currentwidth, currentheight)
     currentyear = theyear
     x = y = 0.0
     centerX = centerY = 0
     radius = 50.0 # starting radius
     moonsize = 16
-    rotation = pi/2
+    rotation = pi
     away = 0
     # How far to step away from center.
     awayStep = moonsize * 0.9
@@ -139,6 +113,8 @@ function spiral_calendar(theyear)
 
     for everyday in enumerate(daterange)
         d = (Dates.year(last(everyday)), Dates.month(last(everyday)), Dates.day(last(everyday)))
+        jd = jdcnv(d...)
+
         away = radius + (awayStep * theta)
 
         # anticlockwise is minus
@@ -147,43 +123,53 @@ function spiral_calendar(theyear)
         x = centerX + (cos(around) * away)
         y = centerY + (sin(around) * away)
 
-        jd = cal_to_jd(d...)
-        moonfrac,moonangle = moon_illuminated_fraction_high(jd) # moonfrac is 1 for full
-        moonlat = moon_latitude(jd)
-        (age,dist,lat,long) = moon_age_location(jd) # age is 15 for full
+        # moonfrac is 1 for full
+        moonfrac = mphase(jd)
+
+        # age is 15 for full, 29 for nearly new
+        (age, dist, lat, long) = moon_age_location(jd)
 
         # draw moon and dayname
         gsave()
         translate(x, y)
         rotate(around + pi/2) # rotate and then get text baseline
-        moon(0, 0, moonsize, age/29.530589, -pi/2, "lightyellow", "midnightblue")
+
+        moon(O, moonsize, age/29.530589, -pi/2, "lightyellow", "midnightblue")
+
         fontface("EurostileLTStd")
         sethue("white")
         fontsize(7)
-        textcentred(Dates.dayname(last(everyday)), 0, - (moonsize + 6)) # dayname
+        # dayname
+        textcentred(Dates.dayname(last(everyday)), 0, - (moonsize + 6))
         grestore()
 
-        # day number isn't rotated
+        # day number isn't rotated!
         gsave()
-        a = atan2(y,x) - 0.01 # adjust for lack of optical
-        x1 , y1 = (away - (moonsize * 1.85)) * cos(a), (away - (moonsize * 1.85)) * sin(a)
-        translate(x1,y1)
+        a = atan2(y, x) - 0.01 # adjust for optical
+        x1, y1 = (away - (moonsize * 1.85)) * cos(a), (away - (moonsize * 1.85)) * sin(a)
+        translate(x1, y1)
         fontface("EurostileLTStd-Bold")
         sethue("white")
         fontsize(11)
-        textcentred(lowercase(string(d[3]))) # day number
+        textcentred(string(d[3])) # day number
         grestore()
 
         # month text needs special handling
         if d[3]==1
             fontsize(20)
             fontface("EurostileLTStd-Bold")
-            m = string("| ", lowercase(Dates.monthname(last(everyday))))
+            m = string(titlecase(Dates.monthname(last(everyday))))
             te = textextents(m)
             sethue("white")
             twwidth = te[5]
+
             # ought to work out the correct final radius, currently just guessing at 1.5 :(
-            spiraltextcurve(m, x, y, 0, 0, away + (moonsize * 2.2), away + (moonsize * 2.2) - 1.5, -(twwidth/4))
+
+            textcurve(m, atan2(y, x), away + (moonsize * 2.2), 0, 0,
+                spiral_ring_step = -10,
+                spiral_in_out_shift = -10,
+                letter_spacing=2)
+
         end
         theta += chord/away
     end
@@ -216,8 +202,9 @@ function spiral_calendar(theyear)
         # orbit ellipse
         gsave()
         Luxor.scale(1, 0.2)
-        circle(0, 0, 45, :stroke)
+        circle(O, 45, :stroke)
         grestore()
+
         # planet and moon
         gsave()
         setline(.7)
@@ -230,6 +217,7 @@ function spiral_calendar(theyear)
         rotate(pi/2)
     end
     grestore()
+
     # and finally an email address
     setopacity(0.8)
     fontsize(4)
@@ -240,13 +228,14 @@ end
 
 # start here
 
-theyear = 2017
-global currentwidth = 1500
-global currentheight = 1500
-Drawing(currentwidth+100, currentheight+100, "/tmp/$(theyear)-moon-phase-calendar.pdf")
+theyear = 2018
+
+currentwidth = 1500
+currentheight = 1500
+
+Drawing(currentwidth + 100, currentheight + 100, "/tmp/$(theyear)-moon-phase-calendar.pdf")
 origin()
 background(RGB(25/255, 25/255, 100/255))
-# rectangular_calendar(theyear)
-spiral_calendar(theyear)
+spiral_calendar(theyear, currentwidth, currentheight)
 finish()
 preview()

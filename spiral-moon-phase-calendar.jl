@@ -1,8 +1,4 @@
-#!/usr/bin/env julia
-
-__precompile__()
-
-using Colors, Luxor, AstroLib
+using Colors, Luxor, AstroLib, Dates
 
 function moon_age_location(jd::Float64)
     # pinched from Astro.jl
@@ -48,7 +44,7 @@ function righthemi(pt, r, col)
     grestore()
 end
 
-function ellipse(pt, r, col, horizscale)
+function elliptical(pt, r, col, horizscale)
     gsave()
     sethue(col)
     Luxor.scale(horizscale + 0.00000001, 1) # cairo doesn't like 0 scale :)
@@ -59,9 +55,9 @@ end
 function moon(pt::Point, r, age, positionangle,
         foregroundcolour="darkblue",
         backgroundcolour="gray")
-    # draw a moon by superimposing three circles or ellipses
+    # draw a moon by superimposing three circles or ellipticals
     # phase is moon's age normalized to 0 - 1, 0 = new moon, 0.5 = 14 days/full, 1.0 = dead moon
-    # ellipse is scaled horizontally to render phases
+    # elliptical is scaled horizontally to render phases
     gsave()
     translate(pt)
     setopacity(1)
@@ -69,27 +65,27 @@ function moon(pt::Point, r, age, positionangle,
         righthemi(pt, r, foregroundcolour)
         moonwidth = 1 - (age * 4) # goes from 1 down to 0 width (for half moon)
         setopacity(0.5)
-        ellipse(O, r + 0.02, RGB(25/255, 25/255, 100/255), moonwidth + 0.02)
+        elliptical(O, r + 0.02, RGB(25/255, 25/255, 100/255), moonwidth + 0.02)
         setopacity(1.0)
-        ellipse(O, r, backgroundcolour, moonwidth)
+        elliptical(O, r, backgroundcolour, moonwidth)
         lefthemi(O, r, backgroundcolour)
     elseif 0.25 <= age < 0.50
         lefthemi(O, r, backgroundcolour)
         righthemi(O, r, foregroundcolour)
         moonwidth = (age - .25) * 4
-        ellipse(O, r, foregroundcolour, moonwidth)
+        elliptical(O, r, foregroundcolour, moonwidth)
     elseif .50 <= age < .75
         lefthemi(O, r, foregroundcolour)
         righthemi(O, r, backgroundcolour)
         moonwidth = 1 - ((age-0.5) * 4)
-        ellipse(O, r, foregroundcolour, moonwidth)
+        elliptical(O, r, foregroundcolour, moonwidth)
     elseif .75 <= age <= 1.00
         lefthemi(O, r, foregroundcolour)
         moonwidth = ((age - 0.75) * 4)
         setopacity(0.5)
-        ellipse(O, r + 0.02, RGB(25/255, 25/255, 100/255), moonwidth + 0.02)
+        elliptical(O, r + 0.02, RGB(25/255, 25/255, 100/255), moonwidth + 0.02)
         setopacity(1.0)
-        ellipse(O, r, backgroundcolour, moonwidth)
+        elliptical(O, r, backgroundcolour, moonwidth)
         righthemi(O, r, backgroundcolour)
     end
     grestore()
@@ -145,7 +141,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
 
         # day number isn't rotated!
         gsave()
-        a = atan2(y, x) - 0.01 # adjust for optical
+        a = atan(y, x) - 0.01 # adjust for optical
         x1, y1 = (away - (moonsize * 1.85)) * cos(a), (away - (moonsize * 1.85)) * sin(a)
         translate(x1, y1)
         fontface("EurostileLTStd-Bold")
@@ -165,7 +161,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
 
             # ought to work out the correct final radius, currently just guessing at 1.5 :(
 
-            textcurve(m, atan2(y, x), away + (moonsize * 2.2), 0, 0,
+            textcurve(m, atan(y, x), away + (moonsize * 2.2), 0, 0,
                 spiral_ring_step = -10,
                 spiral_in_out_shift = -10,
                 letter_spacing=2)
@@ -199,7 +195,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
         shift = textextents("moon phase calendar")[5]
         translate(shift/2, 60)
 
-        # orbit ellipse
+        # orbit elliptical
         gsave()
         Luxor.scale(1, 0.2)
         circle(O, 45, :stroke)
@@ -228,7 +224,7 @@ end
 
 # start here
 
-theyear = 2018
+theyear = 2019
 
 currentwidth = 1500
 currentheight = 1500

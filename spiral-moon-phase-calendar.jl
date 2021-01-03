@@ -1,32 +1,7 @@
-using Colors, Luxor, AstroLib, Dates
+using Colors, Luxor, Dates, JSON3, DataFrames
 
-function moon_age_location(jd::Float64)
-    # pinched from Astro.jl
-    earth_equ_radius = 6378.137
-    v  = (jd - 2451550.1) / 29.530588853
-    ip = v - floor(Integer, v)
-    ag = ip * 29.530588853   # Moon's age from new moon in days
-    ip = ip * 2pi            # Converts to radian
-
-    # Calculate distance from anomalistic phase
-    v = (jd - 2451562.2) / 27.55454988
-    dp = v - floor(Integer, v)
-    dp = dp * 2pi
-    di = 60.4 - 3.3 * cos(dp) - .6 * cos(2 * ip - dp) - .5 * cos(2 * ip)
-
-    # Calculate ecliptic latitude from nodal (draconic) phase
-    v = (jd - 2451565.2) / 27.212220817
-    np = v - floor(Integer, v)
-    np = np * 2pi
-    la = 5.1 * sin(np)
-
-    # Calculate ecliptic longitude from sidereal motion
-    v = (jd - 2451555.8) / 27.321582241
-    rp = v - floor(Integer, v)
-    lo = 360 * rp + 6.3 * sin(dp) + 1.3 * sin(2 * ip - dp) + .7 * sin(2 * ip)
-
-    return (ag, di * earth_equ_radius, deg2rad(la), deg2rad(lo))
-end
+# read data from a dwonloaded copy https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004874/mooninfo_2021.json
+# saved as "nasa-moon-2021-data.json"
 
 function lefthemi(pt, r, col)         # draw a left hemisphere
     gsave()
@@ -50,6 +25,14 @@ function elliptical(pt, r, col, horizscale)
     Luxor.scale(horizscale + 0.00000001, 1) # cairo doesn't like 0 scale :)
     circle(pt, r, :fill)
     grestore()
+end
+
+function getdata()
+    json_string = read("nasa-moon-2021-data.json", String)
+    data = JSON3.read(json_string)
+    df = DataFrame(data)
+    df.isotime = map(dt -> DateTime(replace(dt, r" UT$" => ""), "d u y HH:MM"), df.time)
+    return df
 end
 
 function moon(pt::Point, r, age, positionangle,
@@ -106,24 +89,19 @@ function spiral_calendar(theyear, currentwidth, currentheight)
     sethue("yellow")
 
     daterange = collect(Date(currentyear, 12, 31):-Dates.Day(1):Date(currentyear, 1, 1))
+    df = getdata()
 
-    for everyday in enumerate(daterange)
-        d = (Dates.year(last(everyday)), Dates.month(last(everyday)), Dates.day(last(everyday)))
-        jd = jdcnv(d...)
+    for everyday in daterange
+        d = (Dates.year(everyday), Dates.month(everyday), Dates.day(everyday))
 
         away = radius + (awayStep * theta)
-
-        # anticlockwise is minus
         around = mod2pi(rotation - theta)
-
         x = centerX + (cos(around) * away)
         y = centerY + (sin(around) * away)
 
-        # moonfrac is 1 for full
-        moonfrac = mphase(jd)
 
-        # age is 15 for full, 29 for nearly new
-        (age, dist, lat, long) = moon_age_location(jd)
+        thetime = DateTime(everyday) + Dates.Hour(12)
+        age = first(df[df[:, :isotime] .== thetime, :age])
 
         # draw moon and dayname
         gsave()
@@ -136,7 +114,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
         sethue("white")
         fontsize(7)
         # dayname
-        textcentred(Dates.dayname(last(everyday)), 0, - (moonsize + 6))
+        textcentred(Dates.dayname(everyday), 0, - (moonsize + 6))
         grestore()
 
         # day number isn't rotated!
@@ -154,7 +132,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
         if d[3] == 1
             fontsize(20)
             fontface("ChunkFive")
-            m = string(titlecase(Dates.monthname(last(everyday))))
+            m = string(titlecase(Dates.monthname(everyday)))
             te = textextents(m)
             sethue("white")
             twwidth = te[3]

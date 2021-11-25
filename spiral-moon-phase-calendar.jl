@@ -47,7 +47,7 @@ function moon(pt::Point, r, age, positionangle)
         rotate(deg2rad(positionangle/30)) # reduce apparent rotation for aesthetic
         setopacity(1)
         if 0 <= age < 0.25
-            righthemi(pt, r, foregroundwhite)
+            righthemi(O, r, foregroundwhite)
             moonwidth = 1 - (age * 4) # goes from 1 down to 0 width (for half moon)
             setopacity(0.5)
             elliptical(O, r + 0.02, RGB(25 / 255, 25 / 255, 100 / 255), moonwidth + 0.02)

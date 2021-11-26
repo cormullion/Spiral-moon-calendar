@@ -4,7 +4,7 @@ using Colors, Luxor, Dates, JSON3, DataFrames, Downloads
 download moon data file from NASA, draw a spiral calendar
 =#
 
-function lefthemi(pt, r, col)             # draw a left hemisphere
+function lefthemi(pt, r, col) # draw a left hemisphere
     @layer begin
         sethue(col)
         newpath()
@@ -28,23 +28,13 @@ function elliptical(pt, r, col, horizscale)
     end
 end
 
-function getdata()
-    json_string = read("nasa-moon-2022-data.json", String)
-    data = JSON3.read(json_string)
-    df = DataFrame(data)
-    df.isotime = map(dt -> DateTime(replace(dt, r" UT$" => ""), "d u y HH:MM"), df.time)
-    return df
-end
-
-# draw a moon by superimposing three circles or ellipticals
-
 function moon(pt::Point, r, age, positionangle)
     # use moon synodic period
     age = rescale(age, 0, 29.53059)
     # elliptical is scaled horizontally to render phases
     @layer begin
         translate(pt)
-        rotate(deg2rad(positionangle/30)) # reduce apparent rotation for aesthetic
+        rotate(-deg2rad(positionangle))
         setopacity(1)
         if 0 <= age < 0.25
             righthemi(O, r, foregroundwhite)
@@ -52,16 +42,16 @@ function moon(pt::Point, r, age, positionangle)
             setopacity(0.5)
             elliptical(O, r + 0.02, RGB(25 / 255, 25 / 255, 100 / 255), moonwidth + 0.02)
             setopacity(1.0)
-            elliptical(O, r, backgroundblue, moonwidth)
-            lefthemi(O, r, backgroundblue)
+            elliptical(O, r, backgroundmoon, moonwidth)
+            lefthemi(O, r, backgroundmoon  )
         elseif 0.25 <= age < 0.50
-            lefthemi(O, r, backgroundblue)
+            lefthemi(O, r, backgroundmoon)
             righthemi(O, r, foregroundwhite)
             moonwidth = (age - .25) * 4
             elliptical(O, r, foregroundwhite, moonwidth)
         elseif .50 <= age < .75
             lefthemi(O, r, foregroundwhite)
-            righthemi(O, r, backgroundblue)
+            righthemi(O, r, backgroundmoon)
             moonwidth = 1 - ((age - 0.5) * 4)
             elliptical(O, r, foregroundwhite, moonwidth)
         elseif .75 <= age <= 1.00
@@ -70,11 +60,20 @@ function moon(pt::Point, r, age, positionangle)
             setopacity(0.5)
             elliptical(O, r + 0.02, RGB(25 / 255, 25 / 255, 100 / 255), moonwidth + 0.02)
             setopacity(1.0)
-            elliptical(O, r, backgroundblue, moonwidth)
-            righthemi(O, r, backgroundblue)
+            elliptical(O, r, backgroundmoon, moonwidth)
+            righthemi(O, r, backgroundmoon)
         end
     end
 end
+
+function getdata()
+    json_string = read("nasa-moon-2022-data.json", String)
+    data = JSON3.read(json_string)
+    df = DataFrame(data)
+    df.isotime = map(dt -> DateTime(replace(dt, r" UT$" => ""), "d u y HH:MM"), df.time)
+    return df
+end
+
 
 function spiral_calendar(theyear, currentwidth, currentheight)
     currentyear = theyear
@@ -227,6 +226,7 @@ const currentwidth = 1500
 const currentheight = 1500
 
 const backgroundblue = RGB(16 / 255, 16 / 255, 80 / 255)
+const backgroundmoon = RGB(16 / 255, 16 / 255, 70 / 255)
 const foregroundwhite = RGB(1, 1, 0.87)
 
 Drawing(currentwidth + 100, currentheight + 100, "/tmp/$(theyear)-moon-phase-calendar.pdf")

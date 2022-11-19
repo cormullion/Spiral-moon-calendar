@@ -2,7 +2,31 @@ using Colors, Luxor, Dates, JSON3, DataFrames, Downloads
 
 #=
 download moon data file from NASA, draw a spiral calendar
+
+# download data from NASA
+
+# for 2022 
+# data_url = "https://svs.gsfc.nasa.gov/vis/a000000/a004900/a004955/mooninfo_2022.json"
+# for 2023 
+# data_url = "https://svs.gsfc.nasa.gov/vis/a000000/a005000/a005049/mooninfo_2023.json"
+# Downloads.download(data_url, "nasa-moon-2023-data.json")
 =#
+
+const theyear = 2023
+const currentwidth = 1500
+const currentheight = 1500
+
+const backgroundblue = RGB(16 / 255, 16 / 255, 80 / 255)
+const backgroundmoon = RGB(16 / 255, 16 / 255, 70 / 255)
+const foregroundwhite = RGB(1, 1, 0.87)
+
+function getdata()
+    json_string = read(string(@__DIR__, "/nasa-moon-2023-data.json"), String)
+    data = JSON3.read(json_string)
+    df = DataFrame(data)
+    df.isotime = map(dt -> DateTime(replace(dt, r" UT$" => ""), "d u y HH:MM"), df.time)
+    return df
+end
 
 function lefthemi(pt, r, col) # draw a left hemisphere
     @layer begin
@@ -43,18 +67,18 @@ function moon(pt::Point, r, age, positionangle)
             elliptical(O, r + 0.02, RGB(25 / 255, 25 / 255, 100 / 255), moonwidth + 0.02)
             setopacity(1.0)
             elliptical(O, r, backgroundmoon, moonwidth)
-            lefthemi(O, r, backgroundmoon  )
+            lefthemi(O, r, backgroundmoon)
         elseif 0.25 <= age < 0.50
             lefthemi(O, r, backgroundmoon)
             righthemi(O, r, foregroundwhite)
-            moonwidth = (age - .25) * 4
+            moonwidth = (age - 0.25) * 4
             elliptical(O, r, foregroundwhite, moonwidth)
-        elseif .50 <= age < .75
+        elseif 0.50 <= age < 0.75
             lefthemi(O, r, foregroundwhite)
             righthemi(O, r, backgroundmoon)
             moonwidth = 1 - ((age - 0.5) * 4)
             elliptical(O, r, foregroundwhite, moonwidth)
-        elseif .75 <= age <= 1.00
+        elseif 0.75 <= age <= 1.00
             lefthemi(O, r, foregroundwhite)
             moonwidth = ((age - 0.75) * 4)
             setopacity(0.5)
@@ -65,15 +89,6 @@ function moon(pt::Point, r, age, positionangle)
         end
     end
 end
-
-function getdata()
-    json_string = read("nasa-moon-2022-data.json", String)
-    data = JSON3.read(json_string)
-    df = DataFrame(data)
-    df.isotime = map(dt -> DateTime(replace(dt, r" UT$" => ""), "d u y HH:MM"), df.time)
-    return df
-end
-
 
 function spiral_calendar(theyear, currentwidth, currentheight)
     currentyear = theyear
@@ -90,7 +105,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
     theta = chord / awayStep
     sethue(foregroundwhite)
 
-    daterange = collect(Date(currentyear, 12, 31):-Dates.Day(1):Date(currentyear, 1, 1))
+    daterange = collect(Date(currentyear, 12, 31):(-Dates.Day(1)):Date(currentyear, 1, 1))
     df = getdata()
 
     for everyday in daterange
@@ -102,7 +117,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
         y = centerY + (sin(around) * away)
 
         thetime = DateTime(everyday) + Dates.Hour(12)
-        age   = first(df[df[:, :isotime] .== thetime, :age])
+        age = first(df[df[:, :isotime] .== thetime, :age])
         positionangle = first(df[df[:, :isotime] .== thetime, :posangle])
 
         # draw moon and dayname
@@ -116,7 +131,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
             fontface("EurostileLT")
             sethue(foregroundwhite)
             fontsize(7)
-            text(Dates.dayname(everyday), 0, - (moonsize + 6), halign=:center)
+            text(Dates.dayname(everyday), 0, -(moonsize + 6), halign = :center)
         end
 
         sethue(foregroundwhite)
@@ -128,7 +143,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
             x1, y1 = (away - (moonsize * 1.85)) * cos(a), (away - (moonsize * 1.85)) * sin(a)
             translate(x1, y1)
             fontsize(11)
-            text(string(d[3]), halign=:center) # day number
+            text(string(d[3]), halign = :center) # day number
         end
 
         # month text needs special handling
@@ -149,15 +164,14 @@ function spiral_calendar(theyear, currentwidth, currentheight)
                 te = textextents(string(ch))
                 twwidth = te[1] + te[3] + te[5]
                 pt = polar(r, θ)
-                θ += atan(twwidth, r)/2
+                θ += atan(twwidth, r) / 2
                 @layer begin
                     translate(pt)
-                    rotate(π/2 + θ)
-                    text(string(ch), O, halign=:left)
+                    rotate(π / 2 + θ)
+                    text(string(ch), O, halign = :left)
                 end
                 r -= 0.5
             end
-
         end
         theta += chord / away
     end
@@ -183,7 +197,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
                 text("moon phase calendar", 5, 22)
 
                 # orbital logo
-                setline(.3)
+                setline(0.3)
                 shift = textextents("moon phase calendar")[5]
                 translate(shift / 2, 60)
 
@@ -195,7 +209,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
 
                 # planet and moon
                 @layer begin
-                    setline(.7)
+                    setline(0.7)
                     circle(45, 0, 3, :fill) # moon
                     sethue(backgroundblue)
                     circle(0, -3, 7, :stroke)
@@ -211,23 +225,9 @@ function spiral_calendar(theyear, currentwidth, currentheight)
         fontsize(2)
         sethue(35 / 255, 35 / 255, 150 / 255)
         translate(0, -70 + (currentheight + 100) / 2)
-        text("cormullion@mac.com", halign=:center)
+        text("cormullion@mac.com", halign = :center)
     end
 end
-
-# start here
-
-# download data from NASA
-# data_url = "https://svs.gsfc.nasa.gov/vis/a000000/a004900/a004955/mooninfo_2022.json"
-# Downloads.download(data_url, "nasa-moon-2022-data.json")
-
-const theyear = 2022
-const currentwidth = 1500
-const currentheight = 1500
-
-const backgroundblue = RGB(16 / 255, 16 / 255, 80 / 255)
-const backgroundmoon = RGB(16 / 255, 16 / 255, 70 / 255)
-const foregroundwhite = RGB(1, 1, 0.87)
 
 Drawing(currentwidth + 100, currentheight + 100, "/tmp/$(theyear)-moon-phase-calendar.pdf")
 origin()

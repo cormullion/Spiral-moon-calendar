@@ -1,28 +1,33 @@
-using Colors, Luxor, Dates, JSON3, DataFrames, Downloads
+using Colors, Luxor, Dates, JSON, DataFrames, Downloads
 
 #=
-download moon data file from NASA, draw a spiral calendar
+download moon data file from NASA, and draw a spiral calendar
 
-# download data from NASA
+# download data from NASA, uncomment as required
 
 # for 2022 
 # data_url = "https://svs.gsfc.nasa.gov/vis/a000000/a004900/a004955/mooninfo_2022.json"
+#
 # for 2023 
 # data_url = "https://svs.gsfc.nasa.gov/vis/a000000/a005000/a005049/mooninfo_2023.json"
+# https://svs.gsfc.nasa.gov/5048
 # Downloads.download(data_url, "nasa-moon-2023-data.json")
+#
+# for 2024
+# visit https://svs.gsfc.nasa.gov/5187/ 
 =#
 
-const theyear = 2023
-const currentwidth = 1500
-const currentheight = 1500
+const theyear = 2024
 
-const backgroundblue = RGB(16 / 255, 16 / 255, 80 / 255)
-const backgroundmoon = RGB(16 / 255, 16 / 255, 70 / 255)
-const foregroundwhite = RGB(1, 1, 0.87)
+data_url = "https://svs.gsfc.nasa.gov/vis/a000000/a005100/a005187/mooninfo_2024.json"
+
+if !isfile(string(@__DIR__, "/nasa-moon-$(theyear)-data.json"))
+    Downloads.download(data_url, "nasa-moon-2024-data.json")
+end
 
 function getdata()
-    json_string = read(string(@__DIR__, "/nasa-moon-2023-data.json"), String)
-    data = JSON3.read(json_string)
+    json_string = read(string(@__DIR__, "/nasa-moon-$(theyear)-data.json"), String)
+    data = JSON.parse(json_string)
     df = DataFrame(data)
     df.isotime = map(dt -> DateTime(replace(dt, r" UT$" => ""), "d u y HH:MM"), df.time)
     return df
@@ -90,98 +95,119 @@ function moon(pt::Point, r, age, positionangle)
     end
 end
 
-function spiral_calendar(theyear, currentwidth, currentheight)
-    currentyear = theyear
-    x = y = 0.0
-    centerX = centerY = 0
-    radius = 50.0 # starting radius
-    moonsize = 16 # pixels
-    rotation = π
-    away = 0
-    # spiral stuff
-    # How far to step away from center.
-    awayStep = moonsize * 0.9
-    chord = moonsize * 2.5 # distance between centers (should be more than twice the moon radius...)
-    theta = chord / awayStep
+function pt_on_spiral(θ;
+    center::Point=O,
+    a=150,
+    b=1) # 2πb is distance between 
+    return Point(
+        (a + (b * θ)) * (cos(θ)),
+        (a + (b * θ)) * (sin(θ))
+    )
+end
+
+function spiral_curve(θ₁, θ₂;
+    a=150,
+    b=0,
+    stepby=π / 30)
+    pts = Point[]
+    for θδ in range(θ₁, θ₂, step=stepby)
+        push!(pts, pt_on_spiral(θδ, a=a, b=b))
+    end
+    return pts
+end
+
+function draw_one_day(theyear, theday, start_angle, end_angle, R, b, age, positionangle)
+    # generate a spiral curve
     sethue(foregroundwhite)
-
-    daterange = collect(Date(currentyear, 12, 31):(-Dates.Day(1)):Date(currentyear, 1, 1))
-    df = getdata()
-
-    for everyday in daterange
-        d = (Dates.year(everyday), Dates.month(everyday), Dates.day(everyday))
-
-        away = radius + (awayStep * theta)
-        around = mod2pi(rotation - theta)
-        x = centerX + (cos(around) * away)
-        y = centerY + (sin(around) * away)
-
-        thetime = DateTime(everyday) + Dates.Hour(12)
-        age = first(df[df[:, :isotime] .== thetime, :age])
-        positionangle = first(df[df[:, :isotime] .== thetime, :posangle])
-
-        # draw moon and dayname
-        @layer begin
-            translate(x, y)
-            rotate(around + pi / 2) # rotate and then get text baseline
-
-            moon(O, moonsize, age, positionangle)
-
-            # dayname
-            fontface("EurostileLT")
-            sethue(foregroundwhite)
-            fontsize(7)
-            text(Dates.dayname(everyday), 0, -(moonsize + 6), halign = :center)
-        end
-
-        sethue(foregroundwhite)
-        fontface("EurostileLT-Bold")
-
-        # day number isn't rotated!
-        @layer begin
-            a = atan(y, x) - 0.01 # adjust for optical
-            x1, y1 = (away - (moonsize * 1.85)) * cos(a), (away - (moonsize * 1.85)) * sin(a)
-            translate(x1, y1)
-            fontsize(11)
-            text(string(d[3]), halign = :center) # day number
-        end
-
-        # month text needs special handling
+    fontface("EurostileLT-Bold")
+    d = (Dates.year(theday), Dates.month(theday), Dates.day(theday))
+    # draw month 
+    @layer begin
         if d[3] == 1
-            fontsize(20)
-            m = string(titlecase(Dates.monthname(everyday)))
-            te = textextents(m)
-            r = away + (moonsize * 2.2)
-            θ = atan(y, x)
-            pt = polar(r, θ)
-
-            # you could use this for circular text curve
-            # textcurve(m, θ, r, O)
-
-            # but this follows the spiral better
-
-            for ch in m
-                te = textextents(string(ch))
-                twwidth = te[1] + te[3] + te[5]
-                pt = polar(r, θ)
-                θ += atan(twwidth, r) / 2
-                @layer begin
-                    translate(pt)
-                    rotate(π / 2 + θ)
-                    text(string(ch), O, halign = :left)
+            setline(1)
+            # draw a thin line to separate the rows
+            overline_curve = spiral_curve(start_angle - π / 60, end_angle + π, a=R + 50, b=-b, stepby=π / 120)
+            @layer begin
+                for i in 1:length(overline_curve)-1
+                    setopacity(rescale(i, 1, length(overline_curve), 1, 0))
+                    line(overline_curve[i], overline_curve[i+1], :stroke)
                 end
-                r -= 0.5
+            end
+            # month spiral is above primary spiral
+            m = uppercase(Dates.monthname(theday))
+            @layer begin
+                # draw the month text on the curve
+                baselinecurve = spiral_curve(start_angle - π / 60, end_angle + π / 60, a=R + 33, b=-b, stepby=π / 200)
+                fontsize(16)
+                sethue(foregroundwhite)
+                textonpoly(m, baselinecurve, closed=false)
             end
         end
-        theta += chord / away
     end
 
+    @layer begin
+        # draw moon
+        moonsize = 18 # pixels
+        currentyear = theyear
+        primarycurve = spiral_curve(start_angle, end_angle + 0.5, a=R, b=-b)
+
+        @layer begin
+            sl = slope(O, first(primarycurve))
+            translate(first(primarycurve))
+            rotate(3π/2 + sl)
+            moon(O, moonsize, age, positionangle)
+        end
+        # draw dayname and daynumber
+        @layer begin
+            #fontface("EurostileLT")
+            fontface("EurostileLT-Bold")
+            sethue(foregroundwhite)
+            fontsize(12)
+            #str = string(Dates.dayname(theday), " ", d[3])
+            str = string(d[3])
+            baselinecurve = spiral_curve(start_angle - π / 60, end_angle + π / 30, a=R + 20, b=-b, stepby=π / 200)
+            textonpoly(str, baselinecurve, closed=false)
+        end
+    end
+
+    # return point for updating spiral
+    return first(primarycurve)
+end
+
+function draw_all(currentyear, currentwidth, currentheight)
+    daterange = collect(Date(currentyear, 1, 1):(Dates.Day(1)):Date(currentyear, 12, 31))
+    df = getdata()
+    radius = currentwidth / 2 - 10
+    sep = 90 # gap between days
+    b = 13 # determines the spacing of the spiral
+    rspiral = radius # initial radius
+    start_angle = 3π / 2 # start at the top
+    n = 1
+    # go through every day and draw moon, updating spiral 
+    while n <= length(daterange)
+        thedate = daterange[n]
+        thetime = DateTime(thedate) + Dates.Hour(12)
+        age = first(df[df[:, :isotime].==thetime, :age])
+        positionangle = first(df[df[:, :isotime].==thetime, :posangle]) # degrees :) 
+        θ = sep / rspiral
+        end_angle = start_angle + θ
+        pt = draw_one_day(currentyear, thedate, start_angle, end_angle, radius, b, age, positionangle)
+        start_angle = end_angle
+        n += 1
+        rspiral = distance(O, pt)
+    end
+end
+
+function main(fname)
+    Drawing(currentwidth + 100, currentheight + 100, fname)
+    origin()
+    background(backgroundblue)
+    draw_all(theyear, currentwidth, currentheight)
     # decoration
     setline(4)
-    move(O)
-    rect(-(currentwidth / 2) + 6, -(currentheight / 2) + 6, currentwidth - 12, currentheight - 12, :stroke)
+    box(O, 30 + currentwidth, 30 + currentwidth, :stroke)
     setline(1)
-    rect(-(currentwidth / 2) + 12, -(currentheight / 2) + 12, currentwidth - 24, currentheight - 24, :stroke)
+    box(O, 10 + currentwidth, 10 + currentwidth, :stroke)
 
     @layer begin
         for i in 1:4
@@ -190,7 +216,7 @@ function spiral_calendar(theyear, currentwidth, currentheight)
                 translate(-(currentwidth / 2) + 40, -(currentwidth / 2) + 110)
                 fontsize(81)
                 fontface("EurostileLT-Bold")
-                text(string(currentyear))
+                text(string(theyear))
 
                 fontsize(21)
                 fontface("EurostileLT-Bold")
@@ -219,19 +245,25 @@ function spiral_calendar(theyear, currentwidth, currentheight)
             end
             rotate(pi / 2)
         end # layer
-
+        
         # and finally an email address
         setopacity(0.8)
-        fontsize(2)
+        fontsize(4)
         sethue(35 / 255, 35 / 255, 150 / 255)
         translate(0, -70 + (currentheight + 100) / 2)
         text("cormullion@mac.com", halign = :center)
     end
+    finish()
+    preview()
 end
 
-Drawing(currentwidth + 100, currentheight + 100, "/tmp/$(theyear)-moon-phase-calendar.pdf")
-origin()
-background(backgroundblue)
-spiral_calendar(theyear, currentwidth, currentheight)
-finish()
-preview()
+
+
+const currentwidth = 2000
+const currentheight = 2000
+
+const backgroundblue = RGB(16 / 255, 16 / 255, 80 / 255)
+const backgroundmoon = RGB(16 / 255, 16 / 255, 50 / 255)
+const foregroundwhite = RGB(1, 1, 0.87)
+
+main("/tmp/$(theyear)-spiral-moon-phase-calendar.pdf")
